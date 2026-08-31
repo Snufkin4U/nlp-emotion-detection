@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .DS_Store
 video_script_en.md
+exportToHTML/
