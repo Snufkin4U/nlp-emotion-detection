@@ -1,0 +1,607 @@
+<html>
+<head>
+<title>emotion_nlp_assignment.ipynb</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #bcbec4;}
+.s1 { color: #7a7e85;}
+.s2 { color: #cf8e6d;}
+.s3 { color: #bcbec4;}
+.s4 { color: #2aacb8;}
+.s5 { color: #6aab73;}
+.ls0 { height: 1px; border-width: 0; color: #43454a; background-color:#43454a}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+emotion_nlp_assignment.ipynb</font>
+</center></td></tr></table>
+<pre><span class="s0">#%% md 
+# Machine Learning Assignment: Emotion Recognition from Text 
+ 
+**Assignment type:** Text Analysis / Natural Language Processing   
+**Learning type:** Supervised Multiclass Classification   
+**Learning algorithm:** Multiclass Logistic Regression using scikit-learn   
+**Dataset:** [Emotions dataset for NLP - Kaggle](https://www.kaggle.com/datasets/praveengovi/emotions-dataset-for-nlp) 
+ 
+This notebook presents a complete supervised learning workflow: loading the original 
+Train, Validation, and Test files, exploratory data analysis, TF-IDF feature engineering, 
+training a Logistic Regression classifier, hyperparameter comparison using the Validation 
+set, final training, prediction, and evaluation on the untouched Test set. <hr class="ls0">#%% md 
+## 1. Student Details and AI Assistance 
+ 
+**student name:** Maor C.(212694004) ,Lucas B.(346802507) ,Noam K.(211495510) 
+ 
+### AI prompts used during the project 
+ 
+**Prompt 1 - Requirements and dataset selection**   
+&quot;I attached the machine learning assignment instructions. Analyze all the requirements 
+and choose a simple text-analysis dataset from Kaggle. It should contain separate Train 
+and Test files and be suitable for a classification problem. Explain why you selected it 
+and what must be completed in the assignment.&quot; 
+ 
+**Prompt 2 - Data loading and exploratory analysis**   
+&quot;Build the first part of the notebook: download and load the dataset, display the first 
+five rows of the Train and Test sets, and check missing values, duplicates, and class 
+distribution. Add plots and short explanations for every result.&quot; 
+ 
+**Prompt 3 - Feature engineering**   
+&quot;Perform feature engineering suitable for text analysis. Clean the sentences and convert 
+them into vectors using TF-IDF without causing data leakage from the Test set. Explain 
+TF-IDF and demonstrate the processing on three Train examples and three Test examples.&quot; 
+ 
+**Prompt 4 - Learning algorithm**   
+&quot;Use a ready-made Logistic Regression classifier from scikit-learn. Explain how multiclass 
+Logistic Regression and Softmax work, show the important hyperparameters, and train the 
+model using the TF-IDF features.&quot; 
+ 
+**Prompt 5 - Experiments, evaluation, and submission**   
+&quot;Run several hyperparameter experiments and select the best combination according to 
+Macro-F1 on the Validation set only. Retrain on Train and Validation, then evaluate once 
+on the Test set. Show the first five predictions, Macro-F1, Accuracy, a classification 
+report, a confusion matrix, and error analysis. Finally, organize the notebook for 
+submission and prepare a five-minute presentation script.&quot; 
+ 
+### Purpose of AI use 
+ 
+ChatGPT was used to analyze the assignment requirements, plan the notebook, assist with 
+code structure, explain machine learning concepts, and review the final workflow. The 
+notebook was executed and checked, and the student is expected to understand and explain 
+every stage independently. 
+ 
+**Additional sources:** 
+ 
+- [Kaggle dataset page](https://www.kaggle.com/datasets/praveengovi/emotions-dataset-for-nlp) 
+- [scikit-learn TfidfVectorizer documentation](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html) 
+- [scikit-learn LogisticRegression documentation](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) 
+- [scikit-learn F1-score documentation](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html) <hr class="ls0">#%% md 
+## 2. Learning Problem and Dataset 
+ 
+The objective is to receive an English sentence and classify its expressed emotion into 
+one of six categories: `anger`, `fear`, `joy`, `love`, `sadness`, or `surprise`. This is a 
+supervised multiclass classification problem because every training sentence has a known 
+target label. 
+ 
+The dataset contains 20,000 text samples and is already divided into 16,000 Train samples, 
+2,000 Validation samples, and 2,000 Test samples. No file is split again. The Validation 
+set is used for hyperparameter selection, while the Test set is reserved for the final 
+evaluation only. 
+ 
+**Primary quality metric:** Macro-F1. It calculates the F1-score independently for every 
+class and then takes their unweighted average. Therefore, rare emotions such as `surprise` 
+receive the same importance as frequent emotions such as `joy`. <hr class="ls0">#%% 
+</span><span class="s1"># Imports and reproducibility</span>
+<span class="s2">from </span><span class="s0">pathlib </span><span class="s2">import </span><span class="s0">Path</span>
+<span class="s2">import </span><span class="s0">io</span>
+<span class="s2">import </span><span class="s0">random</span>
+<span class="s2">import </span><span class="s0">re</span>
+<span class="s2">import </span><span class="s0">urllib</span><span class="s3">.</span><span class="s0">request</span>
+<span class="s2">import </span><span class="s0">zipfile</span>
+
+<span class="s2">import </span><span class="s0">matplotlib</span><span class="s3">.</span><span class="s0">pyplot </span><span class="s2">as </span><span class="s0">plt</span>
+<span class="s2">import </span><span class="s0">numpy </span><span class="s2">as </span><span class="s0">np</span>
+<span class="s2">import </span><span class="s0">pandas </span><span class="s2">as </span><span class="s0">pd</span>
+<span class="s2">import </span><span class="s0">seaborn </span><span class="s2">as </span><span class="s0">sns</span>
+<span class="s2">from </span><span class="s0">IPython</span><span class="s3">.</span><span class="s0">display </span><span class="s2">import </span><span class="s0">display</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">feature_extraction</span><span class="s3">.</span><span class="s0">text </span><span class="s2">import </span><span class="s0">TfidfVectorizer</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">linear_model </span><span class="s2">import </span><span class="s0">LogisticRegression</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">metrics </span><span class="s2">import </span><span class="s3">(</span>
+    <span class="s0">accuracy_score</span><span class="s3">,</span>
+    <span class="s0">classification_report</span><span class="s3">,</span>
+    <span class="s0">confusion_matrix</span><span class="s3">,</span>
+    <span class="s0">f1_score</span><span class="s3">,</span>
+<span class="s3">)</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">preprocessing </span><span class="s2">import </span><span class="s0">LabelEncoder</span>
+
+<span class="s0">SEED </span><span class="s3">= </span><span class="s4">42</span>
+<span class="s0">random</span><span class="s3">.</span><span class="s0">seed</span><span class="s3">(</span><span class="s0">SEED</span><span class="s3">)</span>
+<span class="s0">np</span><span class="s3">.</span><span class="s0">random</span><span class="s3">.</span><span class="s0">seed</span><span class="s3">(</span><span class="s0">SEED</span><span class="s3">)</span>
+<span class="s0">pd</span><span class="s3">.</span><span class="s0">set_option</span><span class="s3">(</span><span class="s5">&quot;display.max_colwidth&quot;</span><span class="s3">, </span><span class="s4">120</span><span class="s3">)</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">set_theme</span><span class="s3">(</span><span class="s0">style</span><span class="s3">=</span><span class="s5">&quot;whitegrid&quot;</span><span class="s3">, </span><span class="s0">context</span><span class="s3">=</span><span class="s5">&quot;notebook&quot;</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Environment is ready. Random seed:&quot;</span><span class="s3">, </span><span class="s0">SEED</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+## 3. Downloading and Loading the Original Files 
+ 
+The next cell uses the included local files when they are available. If the notebook is 
+opened in a new Colab environment, it downloads the public Kaggle archive and extracts it. 
+The three original files are loaded separately, with no additional Train/Test split. <hr class="ls0">#%% 
+DATA_DIR </span><span class="s3">= </span><span class="s0">Path</span><span class="s3">(</span><span class="s5">&quot;data&quot;</span><span class="s3">)</span>
+<span class="s0">REQUIRED_FILES </span><span class="s3">= [</span><span class="s5">&quot;train.txt&quot;</span><span class="s3">, </span><span class="s5">&quot;val.txt&quot;</span><span class="s3">, </span><span class="s5">&quot;test.txt&quot;</span><span class="s3">]</span>
+<span class="s0">KAGGLE_DOWNLOAD_URL </span><span class="s3">= (</span>
+    <span class="s5">&quot;https://www.kaggle.com/api/v1/datasets/download/&quot;</span>
+    <span class="s5">&quot;praveengovi/emotions-dataset-for-nlp?datasetVersionNumber=1&quot;</span>
+<span class="s3">)</span>
+
+
+<span class="s2">def </span><span class="s0">ensure_dataset</span><span class="s3">(</span><span class="s0">data_dir</span><span class="s3">=</span><span class="s0">DATA_DIR</span><span class="s3">):</span>
+    <span class="s0">data_dir</span><span class="s3">.</span><span class="s0">mkdir</span><span class="s3">(</span><span class="s0">parents</span><span class="s3">=</span><span class="s2">True</span><span class="s3">, </span><span class="s0">exist_ok</span><span class="s3">=</span><span class="s2">True</span><span class="s3">)</span>
+    <span class="s2">if </span><span class="s0">all</span><span class="s3">((</span><span class="s0">data_dir </span><span class="s3">/ </span><span class="s0">filename</span><span class="s3">).</span><span class="s0">exists</span><span class="s3">() </span><span class="s2">for </span><span class="s0">filename </span><span class="s2">in </span><span class="s0">REQUIRED_FILES</span><span class="s3">):</span>
+        <span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Using the dataset files included with the submission.&quot;</span><span class="s3">)</span>
+        <span class="s2">return</span>
+
+    <span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Dataset files were not found; downloading the public Kaggle archive...&quot;</span><span class="s3">)</span>
+    <span class="s2">with </span><span class="s0">urllib</span><span class="s3">.</span><span class="s0">request</span><span class="s3">.</span><span class="s0">urlopen</span><span class="s3">(</span><span class="s0">KAGGLE_DOWNLOAD_URL</span><span class="s3">, </span><span class="s0">timeout</span><span class="s3">=</span><span class="s4">120</span><span class="s3">) </span><span class="s2">as </span><span class="s0">response</span><span class="s3">:</span>
+        <span class="s0">archive_bytes </span><span class="s3">= </span><span class="s0">response</span><span class="s3">.</span><span class="s0">read</span><span class="s3">()</span>
+    <span class="s2">with </span><span class="s0">zipfile</span><span class="s3">.</span><span class="s0">ZipFile</span><span class="s3">(</span><span class="s0">io</span><span class="s3">.</span><span class="s0">BytesIO</span><span class="s3">(</span><span class="s0">archive_bytes</span><span class="s3">)) </span><span class="s2">as </span><span class="s0">archive</span><span class="s3">:</span>
+        <span class="s0">archive</span><span class="s3">.</span><span class="s0">extractall</span><span class="s3">(</span><span class="s0">data_dir</span><span class="s3">)</span>
+    <span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Download completed.&quot;</span><span class="s3">)</span>
+
+
+<span class="s2">def </span><span class="s0">load_split</span><span class="s3">(</span><span class="s0">path</span><span class="s3">):</span>
+    <span class="s0">rows </span><span class="s3">= []</span>
+    <span class="s2">with </span><span class="s0">open</span><span class="s3">(</span><span class="s0">path</span><span class="s3">, </span><span class="s0">encoding</span><span class="s3">=</span><span class="s5">&quot;utf-8&quot;</span><span class="s3">) </span><span class="s2">as </span><span class="s0">file</span><span class="s3">:</span>
+        <span class="s2">for </span><span class="s0">line_number</span><span class="s3">, </span><span class="s0">line </span><span class="s2">in </span><span class="s0">enumerate</span><span class="s3">(</span><span class="s0">file</span><span class="s3">, </span><span class="s0">start</span><span class="s3">=</span><span class="s4">1</span><span class="s3">):</span>
+            <span class="s0">line </span><span class="s3">= </span><span class="s0">line</span><span class="s3">.</span><span class="s0">rstrip</span><span class="s3">(</span><span class="s5">&quot;</span><span class="s2">\n</span><span class="s5">&quot;</span><span class="s3">)</span>
+            <span class="s2">if not </span><span class="s0">line</span><span class="s3">:</span>
+                <span class="s2">continue</span>
+            <span class="s2">try</span><span class="s3">:</span>
+                <span class="s0">text</span><span class="s3">, </span><span class="s0">label </span><span class="s3">= </span><span class="s0">line</span><span class="s3">.</span><span class="s0">rsplit</span><span class="s3">(</span><span class="s5">&quot;;&quot;</span><span class="s3">, </span><span class="s4">1</span><span class="s3">)</span>
+            <span class="s2">except </span><span class="s0">ValueError </span><span class="s2">as </span><span class="s0">error</span><span class="s3">:</span>
+                <span class="s2">raise </span><span class="s0">ValueError</span><span class="s3">(</span><span class="s5">f&quot;Invalid row </span><span class="s2">{</span><span class="s0">line_number</span><span class="s2">} </span><span class="s5">in </span><span class="s2">{</span><span class="s0">path</span><span class="s2">}</span><span class="s5">&quot;</span><span class="s3">) </span><span class="s2">from </span><span class="s0">error</span>
+            <span class="s0">rows</span><span class="s3">.</span><span class="s0">append</span><span class="s3">((</span><span class="s0">text</span><span class="s3">, </span><span class="s0">label</span><span class="s3">))</span>
+    <span class="s2">return </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span><span class="s0">rows</span><span class="s3">, </span><span class="s0">columns</span><span class="s3">=[</span><span class="s5">&quot;text&quot;</span><span class="s3">, </span><span class="s5">&quot;label&quot;</span><span class="s3">])</span>
+
+
+<span class="s0">ensure_dataset</span><span class="s3">()</span>
+<span class="s0">train_df </span><span class="s3">= </span><span class="s0">load_split</span><span class="s3">(</span><span class="s0">DATA_DIR </span><span class="s3">/ </span><span class="s5">&quot;train.txt&quot;</span><span class="s3">)</span>
+<span class="s0">val_df </span><span class="s3">= </span><span class="s0">load_split</span><span class="s3">(</span><span class="s0">DATA_DIR </span><span class="s3">/ </span><span class="s5">&quot;val.txt&quot;</span><span class="s3">)</span>
+<span class="s0">test_df </span><span class="s3">= </span><span class="s0">load_split</span><span class="s3">(</span><span class="s0">DATA_DIR </span><span class="s3">/ </span><span class="s5">&quot;test.txt&quot;</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;Train: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">)</span><span class="s2">:</span><span class="s5">,</span><span class="s2">} </span><span class="s5">rows&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;Validation: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">val_df</span><span class="s3">)</span><span class="s2">:</span><span class="s5">,</span><span class="s2">} </span><span class="s5">rows&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;Test: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">)</span><span class="s2">:</span><span class="s5">,</span><span class="s2">} </span><span class="s5">rows&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;Total: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">) + </span><span class="s0">len</span><span class="s3">(</span><span class="s0">val_df</span><span class="s3">) + </span><span class="s0">len</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">)</span><span class="s2">:</span><span class="s5">,</span><span class="s2">} </span><span class="s5">rows&quot;</span><span class="s3">)</span>
+<hr class="ls0"><span class="s0">#%% md 
+### First Five Train Rows 
+ <hr class="ls0">#%% 
+display</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">.</span><span class="s0">head</span><span class="s3">())</span>
+<hr class="ls0"><span class="s0">#%% md 
+### First Five Validation Rows <hr class="ls0">#%% 
+display</span><span class="s3">(</span><span class="s0">val_df</span><span class="s3">.</span><span class="s0">head</span><span class="s3">())</span><hr class="ls0"><span class="s0">#%% md 
+### First Five Test Rows <hr class="ls0">#%% 
+display</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">.</span><span class="s0">head</span><span class="s3">())</span><hr class="ls0"><span class="s0">#%% md 
+## 4. Data Quality and Exploratory Analysis 
+ 
+This section checks missing values, duplicate rows, and unexpected labels. It also 
+presents the class distribution and sentence lengths. The classes are not balanced: 
+`joy` and `sadness` are much more common than `surprise`. This supports the use of 
+Macro-F1 as the primary metric. <hr class="ls0">#%% 
+splits </span><span class="s3">= {</span><span class="s5">&quot;Train&quot;</span><span class="s3">: </span><span class="s0">train_df</span><span class="s3">, </span><span class="s5">&quot;Validation&quot;</span><span class="s3">: </span><span class="s0">val_df</span><span class="s3">, </span><span class="s5">&quot;Test&quot;</span><span class="s3">: </span><span class="s0">test_df</span><span class="s3">}</span>
+<span class="s0">quality_rows </span><span class="s3">= []</span>
+<span class="s2">for </span><span class="s0">split_name</span><span class="s3">, </span><span class="s0">frame </span><span class="s2">in </span><span class="s0">splits</span><span class="s3">.</span><span class="s0">items</span><span class="s3">():</span>
+    <span class="s0">quality_rows</span><span class="s3">.</span><span class="s0">append</span><span class="s3">({</span>
+        <span class="s5">&quot;split&quot;</span><span class="s3">: </span><span class="s0">split_name</span><span class="s3">,</span>
+        <span class="s5">&quot;rows&quot;</span><span class="s3">: </span><span class="s0">len</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">),</span>
+        <span class="s5">&quot;missing_text&quot;</span><span class="s3">: </span><span class="s0">int</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">].</span><span class="s0">isna</span><span class="s3">().</span><span class="s0">sum</span><span class="s3">()),</span>
+        <span class="s5">&quot;missing_label&quot;</span><span class="s3">: </span><span class="s0">int</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">].</span><span class="s0">isna</span><span class="s3">().</span><span class="s0">sum</span><span class="s3">()),</span>
+        <span class="s5">&quot;duplicate_rows&quot;</span><span class="s3">: </span><span class="s0">int</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">.</span><span class="s0">duplicated</span><span class="s3">().</span><span class="s0">sum</span><span class="s3">()),</span>
+        <span class="s5">&quot;unique_labels&quot;</span><span class="s3">: </span><span class="s0">frame</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">].</span><span class="s0">nunique</span><span class="s3">(),</span>
+    <span class="s3">})</span>
+
+<span class="s0">quality_df </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span><span class="s0">quality_rows</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">quality_df</span><span class="s3">)</span>
+
+<span class="s0">expected_labels </span><span class="s3">= {</span><span class="s5">&quot;anger&quot;</span><span class="s3">, </span><span class="s5">&quot;fear&quot;</span><span class="s3">, </span><span class="s5">&quot;joy&quot;</span><span class="s3">, </span><span class="s5">&quot;love&quot;</span><span class="s3">, </span><span class="s5">&quot;sadness&quot;</span><span class="s3">, </span><span class="s5">&quot;surprise&quot;</span><span class="s3">}</span>
+<span class="s0">observed_labels </span><span class="s3">= </span><span class="s0">set</span><span class="s3">(</span><span class="s0">pd</span><span class="s3">.</span><span class="s0">concat</span><span class="s3">([</span><span class="s0">train_df</span><span class="s3">, </span><span class="s0">val_df</span><span class="s3">, </span><span class="s0">test_df</span><span class="s3">])[</span><span class="s5">&quot;label&quot;</span><span class="s3">].</span><span class="s0">unique</span><span class="s3">())</span>
+<span class="s2">assert </span><span class="s0">observed_labels </span><span class="s3">== </span><span class="s0">expected_labels</span><span class="s3">, </span><span class="s0">observed_labels</span>
+<span class="s2">assert </span><span class="s0">quality_df</span><span class="s3">[[</span><span class="s5">&quot;missing_text&quot;</span><span class="s3">, </span><span class="s5">&quot;missing_label&quot;</span><span class="s3">]].</span><span class="s0">to_numpy</span><span class="s3">().</span><span class="s0">sum</span><span class="s3">() == </span><span class="s4">0</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Quality checks passed. Labels:&quot;</span><span class="s3">, </span><span class="s0">sorted</span><span class="s3">(</span><span class="s0">observed_labels</span><span class="s3">))</span><hr class="ls0"><span class="s0">#%% 
+distribution </span><span class="s3">= (</span>
+    <span class="s0">pd</span><span class="s3">.</span><span class="s0">concat</span><span class="s3">(</span>
+        <span class="s3">[</span><span class="s0">frame</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">().</span><span class="s0">rename</span><span class="s3">(</span><span class="s0">name</span><span class="s3">) </span><span class="s2">for </span><span class="s0">name</span><span class="s3">, </span><span class="s0">frame </span><span class="s2">in </span><span class="s0">splits</span><span class="s3">.</span><span class="s0">items</span><span class="s3">()],</span>
+        <span class="s0">axis</span><span class="s3">=</span><span class="s4">1</span><span class="s3">,</span>
+    <span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">fillna</span><span class="s3">(</span><span class="s4">0</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">int</span><span class="s3">)</span>
+<span class="s3">)</span>
+<span class="s0">distribution</span><span class="s3">[</span><span class="s5">&quot;Total&quot;</span><span class="s3">] = </span><span class="s0">distribution</span><span class="s3">.</span><span class="s0">sum</span><span class="s3">(</span><span class="s0">axis</span><span class="s3">=</span><span class="s4">1</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">distribution</span><span class="s3">.</span><span class="s0">sort_values</span><span class="s3">(</span><span class="s5">&quot;Total&quot;</span><span class="s3">, </span><span class="s0">ascending</span><span class="s3">=</span><span class="s2">False</span><span class="s3">))</span>
+
+<span class="s0">order </span><span class="s3">= </span><span class="s0">train_df</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">().</span><span class="s0">index</span>
+<span class="s0">fig</span><span class="s3">, </span><span class="s0">axes </span><span class="s3">= </span><span class="s0">plt</span><span class="s3">.</span><span class="s0">subplots</span><span class="s3">(</span><span class="s4">1</span><span class="s3">, </span><span class="s4">2</span><span class="s3">, </span><span class="s0">figsize</span><span class="s3">=(</span><span class="s4">14</span><span class="s3">, </span><span class="s4">4.5</span><span class="s3">))</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">countplot</span><span class="s3">(</span>
+    <span class="s0">data</span><span class="s3">=</span><span class="s0">train_df</span><span class="s3">, </span><span class="s0">x</span><span class="s3">=</span><span class="s5">&quot;label&quot;</span><span class="s3">, </span><span class="s0">order</span><span class="s3">=</span><span class="s0">order</span><span class="s3">, </span><span class="s0">hue</span><span class="s3">=</span><span class="s5">&quot;label&quot;</span><span class="s3">, </span><span class="s0">legend</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+    <span class="s0">ax</span><span class="s3">=</span><span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">], </span><span class="s0">palette</span><span class="s3">=</span><span class="s5">&quot;viridis&quot;</span>
+<span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_title</span><span class="s3">(</span><span class="s5">&quot;Train Class Distribution&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_xlabel</span><span class="s3">(</span><span class="s5">&quot;Emotion&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_ylabel</span><span class="s3">(</span><span class="s5">&quot;Number of Texts&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">tick_params</span><span class="s3">(</span><span class="s0">axis</span><span class="s3">=</span><span class="s5">&quot;x&quot;</span><span class="s3">, </span><span class="s0">rotation</span><span class="s3">=</span><span class="s4">25</span><span class="s3">)</span>
+
+<span class="s0">train_lengths </span><span class="s3">= </span><span class="s0">train_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">].</span><span class="s0">str</span><span class="s3">.</span><span class="s0">split</span><span class="s3">().</span><span class="s0">str</span><span class="s3">.</span><span class="s0">len</span><span class="s3">()</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">histplot</span><span class="s3">(</span><span class="s0">train_lengths</span><span class="s3">, </span><span class="s0">bins</span><span class="s3">=</span><span class="s4">35</span><span class="s3">, </span><span class="s0">color</span><span class="s3">=</span><span class="s5">&quot;#7B2CBF&quot;</span><span class="s3">, </span><span class="s0">ax</span><span class="s3">=</span><span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">])</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_title</span><span class="s3">(</span><span class="s5">&quot;Train Text Length Distribution&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_xlabel</span><span class="s3">(</span><span class="s5">&quot;Words per Text&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_ylabel</span><span class="s3">(</span><span class="s5">&quot;Number of Texts&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">tight_layout</span><span class="s3">()</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Median words per Train text:&quot;</span><span class="s3">, </span><span class="s0">int</span><span class="s3">(</span><span class="s0">train_lengths</span><span class="s3">.</span><span class="s0">median</span><span class="s3">()))</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;95th percentile:&quot;</span><span class="s3">, </span><span class="s0">int</span><span class="s3">(</span><span class="s0">train_lengths</span><span class="s3">.</span><span class="s0">quantile</span><span class="s3">(</span><span class="s4">0.95</span><span class="s3">)))</span><hr class="ls0"><span class="s0">#%% md 
+## 5. Feature Engineering: Text Cleaning and TF-IDF 
+ 
+The feature engineering process includes: 
+ 
+1. Converting text to lowercase. 
+2. Replacing URLs and user mentions with fixed tokens. 
+3. Removing characters that are not letters, apostrophes, or spaces. 
+4. Converting each sentence into a TF-IDF vector. 
+ 
+TF-IDF gives a high weight to a term that is important in a particular document but is 
+not extremely common throughout the corpus. In simplified form: 
+ 
+$$TFIDF(t,d)=TF(t,d)\cdot IDF(t)$$ 
+ 
+The vocabulary and IDF values are fitted on the Train set only. Validation and Test are 
+transformed with the already-fitted vectorizer, preventing data leakage. <hr class="ls0">#%% 
+</span><span class="s2">def </span><span class="s0">clean_text</span><span class="s3">(</span><span class="s0">text</span><span class="s3">):</span>
+    <span class="s0">text </span><span class="s3">= </span><span class="s0">text</span><span class="s3">.</span><span class="s0">lower</span><span class="s3">()</span>
+    <span class="s0">text </span><span class="s3">= </span><span class="s0">re</span><span class="s3">.</span><span class="s0">sub</span><span class="s3">(</span><span class="s5">r&quot;https?://\S+|www\.\S+&quot;</span><span class="s3">, </span><span class="s5">&quot; urltoken &quot;</span><span class="s3">, </span><span class="s0">text</span><span class="s3">)</span>
+    <span class="s0">text </span><span class="s3">= </span><span class="s0">re</span><span class="s3">.</span><span class="s0">sub</span><span class="s3">(</span><span class="s5">r&quot;@\w+&quot;</span><span class="s3">, </span><span class="s5">&quot; usertoken &quot;</span><span class="s3">, </span><span class="s0">text</span><span class="s3">)</span>
+    <span class="s0">text </span><span class="s3">= </span><span class="s0">re</span><span class="s3">.</span><span class="s0">sub</span><span class="s3">(</span><span class="s5">r&quot;[^a-z'\s]&quot;</span><span class="s3">, </span><span class="s5">&quot; &quot;</span><span class="s3">, </span><span class="s0">text</span><span class="s3">)</span>
+    <span class="s0">text </span><span class="s3">= </span><span class="s0">re</span><span class="s3">.</span><span class="s0">sub</span><span class="s3">(</span><span class="s5">r&quot;\s+&quot;</span><span class="s3">, </span><span class="s5">&quot; &quot;</span><span class="s3">, </span><span class="s0">text</span><span class="s3">).</span><span class="s0">strip</span><span class="s3">()</span>
+    <span class="s2">return </span><span class="s0">text</span>
+
+
+<span class="s0">preview_vectorizer </span><span class="s3">= </span><span class="s0">TfidfVectorizer</span><span class="s3">(</span>
+    <span class="s0">preprocessor</span><span class="s3">=</span><span class="s0">clean_text</span><span class="s3">,</span>
+    <span class="s0">lowercase</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+    <span class="s0">ngram_range</span><span class="s3">=(</span><span class="s4">1</span><span class="s3">, </span><span class="s4">1</span><span class="s3">),</span>
+    <span class="s0">min_df</span><span class="s3">=</span><span class="s4">2</span><span class="s3">,</span>
+    <span class="s0">max_features</span><span class="s3">=</span><span class="s4">12_000</span><span class="s3">,</span>
+    <span class="s0">sublinear_tf</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+    <span class="s0">norm</span><span class="s3">=</span><span class="s5">&quot;l2&quot;</span><span class="s3">,</span>
+<span class="s3">)</span>
+<span class="s0">X_preview_train </span><span class="s3">= </span><span class="s0">preview_vectorizer</span><span class="s3">.</span><span class="s0">fit_transform</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+<span class="s0">X_preview_test </span><span class="s3">= </span><span class="s0">preview_vectorizer</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Train TF-IDF shape:&quot;</span><span class="s3">, </span><span class="s0">X_preview_train</span><span class="s3">.</span><span class="s0">shape</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Test TF-IDF shape:&quot;</span><span class="s3">, </span><span class="s0">X_preview_test</span><span class="s3">.</span><span class="s0">shape</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Vocabulary fitted on Train only:&quot;</span><span class="s3">, </span><span class="s0">len</span><span class="s3">(</span><span class="s0">preview_vectorizer</span><span class="s3">.</span><span class="s0">vocabulary_</span><span class="s3">))</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s2">def </span><span class="s0">top_tfidf_features</span><span class="s3">(</span><span class="s0">row</span><span class="s3">, </span><span class="s0">vectorizer</span><span class="s3">, </span><span class="s0">top_n</span><span class="s3">=</span><span class="s4">6</span><span class="s3">):</span>
+    <span class="s2">if </span><span class="s0">row</span><span class="s3">.</span><span class="s0">nnz </span><span class="s3">== </span><span class="s4">0</span><span class="s3">:</span>
+        <span class="s2">return </span><span class="s5">&quot;(no known features)&quot;</span>
+    <span class="s0">names </span><span class="s3">= </span><span class="s0">vectorizer</span><span class="s3">.</span><span class="s0">get_feature_names_out</span><span class="s3">()</span>
+    <span class="s0">order </span><span class="s3">= </span><span class="s0">np</span><span class="s3">.</span><span class="s0">argsort</span><span class="s3">(</span><span class="s0">row</span><span class="s3">.</span><span class="s0">data</span><span class="s3">)[::-</span><span class="s4">1</span><span class="s3">][:</span><span class="s0">top_n</span><span class="s3">]</span>
+    <span class="s0">pairs </span><span class="s3">= [(</span><span class="s0">names</span><span class="s3">[</span><span class="s0">row</span><span class="s3">.</span><span class="s0">indices</span><span class="s3">[</span><span class="s0">i</span><span class="s3">]], </span><span class="s0">float</span><span class="s3">(</span><span class="s0">row</span><span class="s3">.</span><span class="s0">data</span><span class="s3">[</span><span class="s0">i</span><span class="s3">])) </span><span class="s2">for </span><span class="s0">i </span><span class="s2">in </span><span class="s0">order</span><span class="s3">]</span>
+    <span class="s2">return </span><span class="s5">&quot;, &quot;</span><span class="s3">.</span><span class="s0">join</span><span class="s3">(</span><span class="s5">f&quot;</span><span class="s2">{</span><span class="s0">word</span><span class="s2">}</span><span class="s5">=</span><span class="s2">{</span><span class="s0">weight</span><span class="s2">:</span><span class="s5">.3f</span><span class="s2">}</span><span class="s5">&quot; </span><span class="s2">for </span><span class="s0">word</span><span class="s3">, </span><span class="s0">weight </span><span class="s2">in </span><span class="s0">pairs</span><span class="s3">)</span>
+
+
+<span class="s2">def </span><span class="s0">feature_examples</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">, </span><span class="s0">matrix</span><span class="s3">, </span><span class="s0">vectorizer</span><span class="s3">, </span><span class="s0">indices</span><span class="s3">):</span>
+    <span class="s0">rows </span><span class="s3">= []</span>
+    <span class="s2">for </span><span class="s0">index </span><span class="s2">in </span><span class="s0">indices</span><span class="s3">:</span>
+        <span class="s0">rows</span><span class="s3">.</span><span class="s0">append</span><span class="s3">({</span>
+            <span class="s5">&quot;split_index&quot;</span><span class="s3">: </span><span class="s0">index</span><span class="s3">,</span>
+            <span class="s5">&quot;original_text&quot;</span><span class="s3">: </span><span class="s0">frame</span><span class="s3">.</span><span class="s0">iloc</span><span class="s3">[</span><span class="s0">index</span><span class="s3">][</span><span class="s5">&quot;text&quot;</span><span class="s3">],</span>
+            <span class="s5">&quot;clean_text&quot;</span><span class="s3">: </span><span class="s0">clean_text</span><span class="s3">(</span><span class="s0">frame</span><span class="s3">.</span><span class="s0">iloc</span><span class="s3">[</span><span class="s0">index</span><span class="s3">][</span><span class="s5">&quot;text&quot;</span><span class="s3">]),</span>
+            <span class="s5">&quot;label&quot;</span><span class="s3">: </span><span class="s0">frame</span><span class="s3">.</span><span class="s0">iloc</span><span class="s3">[</span><span class="s0">index</span><span class="s3">][</span><span class="s5">&quot;label&quot;</span><span class="s3">],</span>
+            <span class="s5">&quot;top_tfidf_features&quot;</span><span class="s3">: </span><span class="s0">top_tfidf_features</span><span class="s3">(</span><span class="s0">matrix</span><span class="s3">[</span><span class="s0">index</span><span class="s3">], </span><span class="s0">vectorizer</span><span class="s3">),</span>
+        <span class="s3">})</span>
+    <span class="s2">return </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span><span class="s0">rows</span><span class="s3">)</span>
+
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Three Train examples after feature engineering:&quot;</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">feature_examples</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">, </span><span class="s0">X_preview_train</span><span class="s3">, </span><span class="s0">preview_vectorizer</span><span class="s3">, [</span><span class="s4">0</span><span class="s3">, </span><span class="s4">1</span><span class="s3">, </span><span class="s4">2</span><span class="s3">]))</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Three Test examples after feature engineering:&quot;</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">feature_examples</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">, </span><span class="s0">X_preview_test</span><span class="s3">, </span><span class="s0">preview_vectorizer</span><span class="s3">, [</span><span class="s4">0</span><span class="s3">, </span><span class="s4">1</span><span class="s3">, </span><span class="s4">2</span><span class="s3">]))</span><hr class="ls0"><span class="s0">#%% md 
+## 6. Learning Algorithm: scikit-learn Logistic Regression 
+ 
+This project uses the ready-made `LogisticRegression` implementation from scikit-learn. 
+Logistic Regression calculates a linear score for every class: 
+ 
+$$z = xW + b$$ 
+ 
+In multiclass classification, these scores are converted into probabilities using Softmax: 
+ 
+$$P(y=k\mid x)=\frac{e^{z_k}}{\sum_j e^{z_j}}$$ 
+ 
+The model learns weights by minimizing cross-entropy loss with L2 regularization. The main 
+hyperparameters tested in this notebook are: 
+ 
+- `C`: inverse regularization strength. A larger value means weaker regularization. 
+- `class_weight`: whether rare classes receive larger training weights. 
+- `max_iter`: maximum number of optimization iterations. 
+- `solver`: the numerical optimization method. 
+- `ngram_range` and `max_features`: TF-IDF feature parameters. 
+ 
+The estimator supplies standard `fit`, `predict`, and `predict_proba` methods. <hr class="ls0">#%% md 
+## 7. Hyperparameter Experiments on the Validation Set 
+ 
+The Test labels are not used in this stage. Four combinations are evaluated: a baseline 
+without class weights, two values of `C` with balanced class weights, and a model that 
+also includes bigrams. Each TF-IDF vectorizer is fitted on Train only, while Validation is 
+used exclusively for comparison. <hr class="ls0">#%% 
+label_encoder </span><span class="s3">= </span><span class="s0">LabelEncoder</span><span class="s3">()</span>
+<span class="s0">y_train </span><span class="s3">= </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">fit_transform</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">])</span>
+<span class="s0">y_val </span><span class="s3">= </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">val_df</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">])</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Encoded classes:&quot;</span><span class="s3">, </span><span class="s0">dict</span><span class="s3">(</span><span class="s0">enumerate</span><span class="s3">(</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">)))</span>
+
+<span class="s0">experiments </span><span class="s3">= [</span>
+    <span class="s3">{</span>
+        <span class="s5">&quot;name&quot;</span><span class="s3">: </span><span class="s5">&quot;A - baseline&quot;</span><span class="s3">,</span>
+        <span class="s5">&quot;ngram_range&quot;</span><span class="s3">: (</span><span class="s4">1</span><span class="s3">, </span><span class="s4">1</span><span class="s3">),</span>
+        <span class="s5">&quot;max_features&quot;</span><span class="s3">: </span><span class="s4">12_000</span><span class="s3">,</span>
+        <span class="s5">&quot;C&quot;</span><span class="s3">: </span><span class="s4">1.0</span><span class="s3">,</span>
+        <span class="s5">&quot;class_weight&quot;</span><span class="s3">: </span><span class="s2">None</span><span class="s3">,</span>
+    <span class="s3">},</span>
+    <span class="s3">{</span>
+        <span class="s5">&quot;name&quot;</span><span class="s3">: </span><span class="s5">&quot;B - balanced classes&quot;</span><span class="s3">,</span>
+        <span class="s5">&quot;ngram_range&quot;</span><span class="s3">: (</span><span class="s4">1</span><span class="s3">, </span><span class="s4">1</span><span class="s3">),</span>
+        <span class="s5">&quot;max_features&quot;</span><span class="s3">: </span><span class="s4">12_000</span><span class="s3">,</span>
+        <span class="s5">&quot;C&quot;</span><span class="s3">: </span><span class="s4">1.0</span><span class="s3">,</span>
+        <span class="s5">&quot;class_weight&quot;</span><span class="s3">: </span><span class="s5">&quot;balanced&quot;</span><span class="s3">,</span>
+    <span class="s3">},</span>
+    <span class="s3">{</span>
+        <span class="s5">&quot;name&quot;</span><span class="s3">: </span><span class="s5">&quot;C - balanced, weaker regularization&quot;</span><span class="s3">,</span>
+        <span class="s5">&quot;ngram_range&quot;</span><span class="s3">: (</span><span class="s4">1</span><span class="s3">, </span><span class="s4">1</span><span class="s3">),</span>
+        <span class="s5">&quot;max_features&quot;</span><span class="s3">: </span><span class="s4">12_000</span><span class="s3">,</span>
+        <span class="s5">&quot;C&quot;</span><span class="s3">: </span><span class="s4">4.0</span><span class="s3">,</span>
+        <span class="s5">&quot;class_weight&quot;</span><span class="s3">: </span><span class="s5">&quot;balanced&quot;</span><span class="s3">,</span>
+    <span class="s3">},</span>
+    <span class="s3">{</span>
+        <span class="s5">&quot;name&quot;</span><span class="s3">: </span><span class="s5">&quot;D - unigrams and bigrams&quot;</span><span class="s3">,</span>
+        <span class="s5">&quot;ngram_range&quot;</span><span class="s3">: (</span><span class="s4">1</span><span class="s3">, </span><span class="s4">2</span><span class="s3">),</span>
+        <span class="s5">&quot;max_features&quot;</span><span class="s3">: </span><span class="s4">20_000</span><span class="s3">,</span>
+        <span class="s5">&quot;C&quot;</span><span class="s3">: </span><span class="s4">4.0</span><span class="s3">,</span>
+        <span class="s5">&quot;class_weight&quot;</span><span class="s3">: </span><span class="s5">&quot;balanced&quot;</span><span class="s3">,</span>
+    <span class="s3">},</span>
+<span class="s3">]</span>
+
+<span class="s0">experiment_rows </span><span class="s3">= []</span>
+
+<span class="s2">for </span><span class="s0">config </span><span class="s2">in </span><span class="s0">experiments</span><span class="s3">:</span>
+    <span class="s0">vectorizer </span><span class="s3">= </span><span class="s0">TfidfVectorizer</span><span class="s3">(</span>
+        <span class="s0">preprocessor</span><span class="s3">=</span><span class="s0">clean_text</span><span class="s3">,</span>
+        <span class="s0">lowercase</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+        <span class="s0">ngram_range</span><span class="s3">=</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;ngram_range&quot;</span><span class="s3">],</span>
+        <span class="s0">min_df</span><span class="s3">=</span><span class="s4">2</span><span class="s3">,</span>
+        <span class="s0">max_features</span><span class="s3">=</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;max_features&quot;</span><span class="s3">],</span>
+        <span class="s0">sublinear_tf</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+        <span class="s0">norm</span><span class="s3">=</span><span class="s5">&quot;l2&quot;</span><span class="s3">,</span>
+    <span class="s3">)</span>
+    <span class="s0">X_train </span><span class="s3">= </span><span class="s0">vectorizer</span><span class="s3">.</span><span class="s0">fit_transform</span><span class="s3">(</span><span class="s0">train_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+    <span class="s0">X_val </span><span class="s3">= </span><span class="s0">vectorizer</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">val_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+
+    <span class="s0">model </span><span class="s3">= </span><span class="s0">LogisticRegression</span><span class="s3">(</span>
+        <span class="s0">C</span><span class="s3">=</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;C&quot;</span><span class="s3">],</span>
+        <span class="s0">class_weight</span><span class="s3">=</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;class_weight&quot;</span><span class="s3">],</span>
+        <span class="s0">max_iter</span><span class="s3">=</span><span class="s4">500</span><span class="s3">,</span>
+        <span class="s0">solver</span><span class="s3">=</span><span class="s5">&quot;lbfgs&quot;</span><span class="s3">,</span>
+        <span class="s0">random_state</span><span class="s3">=</span><span class="s0">SEED</span><span class="s3">,</span>
+    <span class="s3">)</span>
+    <span class="s0">model</span><span class="s3">.</span><span class="s0">fit</span><span class="s3">(</span><span class="s0">X_train</span><span class="s3">, </span><span class="s0">y_train</span><span class="s3">)</span>
+    <span class="s0">val_predictions </span><span class="s3">= </span><span class="s0">model</span><span class="s3">.</span><span class="s0">predict</span><span class="s3">(</span><span class="s0">X_val</span><span class="s3">)</span>
+
+    <span class="s0">experiment_rows</span><span class="s3">.</span><span class="s0">append</span><span class="s3">({</span>
+        <span class="s5">&quot;experiment&quot;</span><span class="s3">: </span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;name&quot;</span><span class="s3">],</span>
+        <span class="s5">&quot;ngram_range&quot;</span><span class="s3">: </span><span class="s0">str</span><span class="s3">(</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;ngram_range&quot;</span><span class="s3">]),</span>
+        <span class="s5">&quot;features&quot;</span><span class="s3">: </span><span class="s0">X_train</span><span class="s3">.</span><span class="s0">shape</span><span class="s3">[</span><span class="s4">1</span><span class="s3">],</span>
+        <span class="s5">&quot;C&quot;</span><span class="s3">: </span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;C&quot;</span><span class="s3">],</span>
+        <span class="s5">&quot;class_weight&quot;</span><span class="s3">: </span><span class="s0">str</span><span class="s3">(</span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;class_weight&quot;</span><span class="s3">]),</span>
+        <span class="s5">&quot;iterations&quot;</span><span class="s3">: </span><span class="s0">int</span><span class="s3">(</span><span class="s0">model</span><span class="s3">.</span><span class="s0">n_iter_</span><span class="s3">.</span><span class="s0">max</span><span class="s3">()),</span>
+        <span class="s5">&quot;validation_macro_f1&quot;</span><span class="s3">: </span><span class="s0">f1_score</span><span class="s3">(</span><span class="s0">y_val</span><span class="s3">, </span><span class="s0">val_predictions</span><span class="s3">, </span><span class="s0">average</span><span class="s3">=</span><span class="s5">&quot;macro&quot;</span><span class="s3">),</span>
+        <span class="s5">&quot;validation_accuracy&quot;</span><span class="s3">: </span><span class="s0">accuracy_score</span><span class="s3">(</span><span class="s0">y_val</span><span class="s3">, </span><span class="s0">val_predictions</span><span class="s3">),</span>
+    <span class="s3">})</span>
+    <span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Finished:&quot;</span><span class="s3">, </span><span class="s0">config</span><span class="s3">[</span><span class="s5">&quot;name&quot;</span><span class="s3">])</span>
+
+<span class="s0">results_df </span><span class="s3">= (</span>
+    <span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span><span class="s0">experiment_rows</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">sort_values</span><span class="s3">(</span><span class="s5">&quot;validation_macro_f1&quot;</span><span class="s3">, </span><span class="s0">ascending</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">reset_index</span><span class="s3">(</span><span class="s0">drop</span><span class="s3">=</span><span class="s2">True</span><span class="s3">)</span>
+<span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">results_df</span><span class="s3">.</span><span class="s0">style</span><span class="s3">.</span><span class="s0">format</span><span class="s3">({</span>
+    <span class="s5">&quot;validation_macro_f1&quot;</span><span class="s3">: </span><span class="s5">&quot;{:.4f}&quot;</span><span class="s3">,</span>
+    <span class="s5">&quot;validation_accuracy&quot;</span><span class="s3">: </span><span class="s5">&quot;{:.4f}&quot;</span><span class="s3">,</span>
+<span class="s3">}))</span><hr class="ls0"><span class="s0">#%% 
+plt</span><span class="s3">.</span><span class="s0">figure</span><span class="s3">(</span><span class="s0">figsize</span><span class="s3">=(</span><span class="s4">10</span><span class="s3">, </span><span class="s4">4.8</span><span class="s3">))</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">barplot</span><span class="s3">(</span>
+    <span class="s0">data</span><span class="s3">=</span><span class="s0">results_df</span><span class="s3">,</span>
+    <span class="s0">y</span><span class="s3">=</span><span class="s5">&quot;experiment&quot;</span><span class="s3">,</span>
+    <span class="s0">x</span><span class="s3">=</span><span class="s5">&quot;validation_macro_f1&quot;</span><span class="s3">,</span>
+    <span class="s0">hue</span><span class="s3">=</span><span class="s5">&quot;experiment&quot;</span><span class="s3">,</span>
+    <span class="s0">legend</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+    <span class="s0">palette</span><span class="s3">=</span><span class="s5">&quot;mako&quot;</span><span class="s3">,</span>
+<span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">xlim</span><span class="s3">(</span><span class="s4">0.75</span><span class="s3">, </span><span class="s4">0.90</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">title</span><span class="s3">(</span><span class="s5">&quot;Validation Macro-F1 by Experiment&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">xlabel</span><span class="s3">(</span><span class="s5">&quot;Macro-F1&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">ylabel</span><span class="s3">(</span><span class="s5">&quot;&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">tight_layout</span><span class="s3">()</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<span class="s0">best_experiment_name </span><span class="s3">= </span><span class="s0">results_df</span><span class="s3">.</span><span class="s0">iloc</span><span class="s3">[</span><span class="s4">0</span><span class="s3">][</span><span class="s5">&quot;experiment&quot;</span><span class="s3">]</span>
+<span class="s0">best_config </span><span class="s3">= </span><span class="s0">next</span><span class="s3">(</span><span class="s0">item </span><span class="s2">for </span><span class="s0">item </span><span class="s2">in </span><span class="s0">experiments </span><span class="s2">if </span><span class="s0">item</span><span class="s3">[</span><span class="s5">&quot;name&quot;</span><span class="s3">] == </span><span class="s0">best_experiment_name</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Selected configuration:&quot;</span><span class="s3">, </span><span class="s0">best_experiment_name</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">best_config</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+### Validation Conclusion 
+ 
+Balanced class weights substantially improve Macro-F1 because rare emotions contribute 
+more strongly to model training. Increasing `C` from 1 to 4 also improves the Validation 
+result by reducing regularization. Bigrams do not improve performance in this experiment; 
+they increase the feature space and introduce many relatively rare combinations. The 
+configuration with the highest Validation Macro-F1 is selected automatically. <hr class="ls0">#%% md 
+## 8. Final Training on Train and Validation 
+ 
+After selecting the hyperparameters, the vectorizer and classifier are fitted again using 
+all 18,000 Train and Validation samples. The Test set is still excluded from model fitting 
+and hyperparameter selection. <hr class="ls0">#%% 
+full_train_df </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">concat</span><span class="s3">([</span><span class="s0">train_df</span><span class="s3">, </span><span class="s0">val_df</span><span class="s3">], </span><span class="s0">ignore_index</span><span class="s3">=</span><span class="s2">True</span><span class="s3">)</span>
+<span class="s0">y_full_train </span><span class="s3">= </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">full_train_df</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">])</span>
+<span class="s0">y_test </span><span class="s3">= </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">[</span><span class="s5">&quot;label&quot;</span><span class="s3">])</span>
+
+<span class="s0">final_vectorizer </span><span class="s3">= </span><span class="s0">TfidfVectorizer</span><span class="s3">(</span>
+    <span class="s0">preprocessor</span><span class="s3">=</span><span class="s0">clean_text</span><span class="s3">,</span>
+    <span class="s0">lowercase</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+    <span class="s0">ngram_range</span><span class="s3">=</span><span class="s0">best_config</span><span class="s3">[</span><span class="s5">&quot;ngram_range&quot;</span><span class="s3">],</span>
+    <span class="s0">min_df</span><span class="s3">=</span><span class="s4">2</span><span class="s3">,</span>
+    <span class="s0">max_features</span><span class="s3">=</span><span class="s0">best_config</span><span class="s3">[</span><span class="s5">&quot;max_features&quot;</span><span class="s3">],</span>
+    <span class="s0">sublinear_tf</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+    <span class="s0">norm</span><span class="s3">=</span><span class="s5">&quot;l2&quot;</span><span class="s3">,</span>
+<span class="s3">)</span>
+<span class="s0">X_full_train </span><span class="s3">= </span><span class="s0">final_vectorizer</span><span class="s3">.</span><span class="s0">fit_transform</span><span class="s3">(</span><span class="s0">full_train_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+<span class="s0">X_test </span><span class="s3">= </span><span class="s0">final_vectorizer</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">[</span><span class="s5">&quot;text&quot;</span><span class="s3">])</span>
+
+<span class="s0">final_model </span><span class="s3">= </span><span class="s0">LogisticRegression</span><span class="s3">(</span>
+    <span class="s0">C</span><span class="s3">=</span><span class="s0">best_config</span><span class="s3">[</span><span class="s5">&quot;C&quot;</span><span class="s3">],</span>
+    <span class="s0">class_weight</span><span class="s3">=</span><span class="s0">best_config</span><span class="s3">[</span><span class="s5">&quot;class_weight&quot;</span><span class="s3">],</span>
+    <span class="s0">max_iter</span><span class="s3">=</span><span class="s4">500</span><span class="s3">,</span>
+    <span class="s0">solver</span><span class="s3">=</span><span class="s5">&quot;lbfgs&quot;</span><span class="s3">,</span>
+    <span class="s0">random_state</span><span class="s3">=</span><span class="s0">SEED</span><span class="s3">,</span>
+<span class="s3">)</span>
+<span class="s0">final_model</span><span class="s3">.</span><span class="s0">fit</span><span class="s3">(</span><span class="s0">X_full_train</span><span class="s3">, </span><span class="s0">y_full_train</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Final Train matrix:&quot;</span><span class="s3">, </span><span class="s0">X_full_train</span><span class="s3">.</span><span class="s0">shape</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Test matrix:&quot;</span><span class="s3">, </span><span class="s0">X_test</span><span class="s3">.</span><span class="s0">shape</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">&quot;Optimization iterations:&quot;</span><span class="s3">, </span><span class="s0">int</span><span class="s3">(</span><span class="s0">final_model</span><span class="s3">.</span><span class="s0">n_iter_</span><span class="s3">.</span><span class="s0">max</span><span class="s3">()))</span><hr class="ls0"><span class="s0">#%% md 
+## 9. Prediction and Final Test Evaluation 
+ 
+This is the first stage in which the Test labels are used for performance measurement. 
+The first five predictions are displayed, followed by Macro-F1, Accuracy, a per-class 
+report, and a confusion matrix. <hr class="ls0">#%% 
+test_probabilities </span><span class="s3">= </span><span class="s0">final_model</span><span class="s3">.</span><span class="s0">predict_proba</span><span class="s3">(</span><span class="s0">X_test</span><span class="s3">)</span>
+<span class="s0">test_predictions </span><span class="s3">= </span><span class="s0">final_model</span><span class="s3">.</span><span class="s0">predict</span><span class="s3">(</span><span class="s0">X_test</span><span class="s3">)</span>
+<span class="s0">predicted_labels </span><span class="s3">= </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">inverse_transform</span><span class="s3">(</span><span class="s0">test_predictions</span><span class="s3">)</span>
+
+<span class="s0">first_five_predictions </span><span class="s3">= </span><span class="s0">test_df</span><span class="s3">.</span><span class="s0">head</span><span class="s3">(</span><span class="s4">5</span><span class="s3">).</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s0">first_five_predictions</span><span class="s3">[</span><span class="s5">&quot;predicted_label&quot;</span><span class="s3">] = </span><span class="s0">predicted_labels</span><span class="s3">[:</span><span class="s4">5</span><span class="s3">]</span>
+<span class="s0">first_five_predictions</span><span class="s3">[</span><span class="s5">&quot;confidence&quot;</span><span class="s3">] = </span><span class="s0">test_probabilities</span><span class="s3">[:</span><span class="s4">5</span><span class="s3">].</span><span class="s0">max</span><span class="s3">(</span><span class="s0">axis</span><span class="s3">=</span><span class="s4">1</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">first_five_predictions</span><span class="s3">.</span><span class="s0">style</span><span class="s3">.</span><span class="s0">format</span><span class="s3">({</span><span class="s5">&quot;confidence&quot;</span><span class="s3">: </span><span class="s5">&quot;{:.3f}&quot;</span><span class="s3">}))</span><hr class="ls0"><span class="s0">#%% 
+test_macro_f1 </span><span class="s3">= </span><span class="s0">f1_score</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">test_predictions</span><span class="s3">, </span><span class="s0">average</span><span class="s3">=</span><span class="s5">&quot;macro&quot;</span><span class="s3">)</span>
+<span class="s0">test_accuracy </span><span class="s3">= </span><span class="s0">accuracy_score</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">test_predictions</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;FINAL TEST MACRO-F1: </span><span class="s2">{</span><span class="s0">test_macro_f1</span><span class="s2">:</span><span class="s5">.4f</span><span class="s2">}</span><span class="s5">&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;FINAL TEST ACCURACY: </span><span class="s2">{</span><span class="s0">test_accuracy</span><span class="s2">:</span><span class="s5">.4f</span><span class="s2">}</span><span class="s5">&quot;</span><span class="s3">)</span>
+
+<span class="s0">report_df </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span>
+    <span class="s0">classification_report</span><span class="s3">(</span>
+        <span class="s0">y_test</span><span class="s3">,</span>
+        <span class="s0">test_predictions</span><span class="s3">,</span>
+        <span class="s0">target_names</span><span class="s3">=</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">,</span>
+        <span class="s0">output_dict</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+        <span class="s0">zero_division</span><span class="s3">=</span><span class="s4">0</span><span class="s3">,</span>
+    <span class="s3">)</span>
+<span class="s3">).</span><span class="s0">T</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">report_df</span><span class="s3">.</span><span class="s0">style</span><span class="s3">.</span><span class="s0">format</span><span class="s3">(</span><span class="s5">&quot;{:.4f}&quot;</span><span class="s3">))</span><hr class="ls0"><span class="s0">#%% 
+matrix </span><span class="s3">= </span><span class="s0">confusion_matrix</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">test_predictions</span><span class="s3">)</span>
+<span class="s0">per_class_f1 </span><span class="s3">= </span><span class="s0">report_df</span><span class="s3">.</span><span class="s0">loc</span><span class="s3">[</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">, </span><span class="s5">&quot;f1-score&quot;</span><span class="s3">].</span><span class="s0">sort_values</span><span class="s3">()</span>
+
+<span class="s0">fig</span><span class="s3">, </span><span class="s0">axes </span><span class="s3">= </span><span class="s0">plt</span><span class="s3">.</span><span class="s0">subplots</span><span class="s3">(</span><span class="s4">1</span><span class="s3">, </span><span class="s4">2</span><span class="s3">, </span><span class="s0">figsize</span><span class="s3">=(</span><span class="s4">14</span><span class="s3">, </span><span class="s4">5.2</span><span class="s3">))</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">heatmap</span><span class="s3">(</span>
+    <span class="s0">matrix</span><span class="s3">,</span>
+    <span class="s0">annot</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+    <span class="s0">fmt</span><span class="s3">=</span><span class="s5">&quot;d&quot;</span><span class="s3">,</span>
+    <span class="s0">cmap</span><span class="s3">=</span><span class="s5">&quot;Blues&quot;</span><span class="s3">,</span>
+    <span class="s0">xticklabels</span><span class="s3">=</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">,</span>
+    <span class="s0">yticklabels</span><span class="s3">=</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">,</span>
+    <span class="s0">ax</span><span class="s3">=</span><span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">],</span>
+<span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_title</span><span class="s3">(</span><span class="s5">&quot;Test Confusion Matrix&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_xlabel</span><span class="s3">(</span><span class="s5">&quot;Predicted Label&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">0</span><span class="s3">].</span><span class="s0">set_ylabel</span><span class="s3">(</span><span class="s5">&quot;True Label&quot;</span><span class="s3">)</span>
+
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">barplot</span><span class="s3">(</span>
+    <span class="s0">x</span><span class="s3">=</span><span class="s0">per_class_f1</span><span class="s3">.</span><span class="s0">values</span><span class="s3">,</span>
+    <span class="s0">y</span><span class="s3">=</span><span class="s0">per_class_f1</span><span class="s3">.</span><span class="s0">index</span><span class="s3">,</span>
+    <span class="s0">hue</span><span class="s3">=</span><span class="s0">per_class_f1</span><span class="s3">.</span><span class="s0">index</span><span class="s3">,</span>
+    <span class="s0">legend</span><span class="s3">=</span><span class="s2">False</span><span class="s3">,</span>
+    <span class="s0">palette</span><span class="s3">=</span><span class="s5">&quot;rocket&quot;</span><span class="s3">,</span>
+    <span class="s0">ax</span><span class="s3">=</span><span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">],</span>
+<span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_xlim</span><span class="s3">(</span><span class="s4">0</span><span class="s3">, </span><span class="s4">1</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_title</span><span class="s3">(</span><span class="s5">&quot;Test F1-Score per Emotion&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_xlabel</span><span class="s3">(</span><span class="s5">&quot;F1-Score&quot;</span><span class="s3">)</span>
+<span class="s0">axes</span><span class="s3">[</span><span class="s4">1</span><span class="s3">].</span><span class="s0">set_ylabel</span><span class="s3">(</span><span class="s5">&quot;Emotion&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">tight_layout</span><span class="s3">()</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span><hr class="ls0"><span class="s0">#%% md 
+## 10. Model Interpretation and Error Analysis 
+ 
+Logistic Regression learns a coefficient for every TF-IDF feature and every class. 
+Features with large positive coefficients push a prediction toward the corresponding 
+emotion. The following table presents the highest-weight terms for each class, followed 
+by several high-confidence mistakes. <hr class="ls0">#%% 
+feature_names </span><span class="s3">= </span><span class="s0">final_vectorizer</span><span class="s3">.</span><span class="s0">get_feature_names_out</span><span class="s3">()</span>
+<span class="s0">top_words </span><span class="s3">= {}</span>
+<span class="s2">for </span><span class="s0">class_index</span><span class="s3">, </span><span class="s0">class_name </span><span class="s2">in </span><span class="s0">enumerate</span><span class="s3">(</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">):</span>
+    <span class="s0">best_indices </span><span class="s3">= </span><span class="s0">np</span><span class="s3">.</span><span class="s0">argsort</span><span class="s3">(</span><span class="s0">final_model</span><span class="s3">.</span><span class="s0">coef_</span><span class="s3">[</span><span class="s0">class_index</span><span class="s3">])[-</span><span class="s4">10</span><span class="s3">:][::-</span><span class="s4">1</span><span class="s3">]</span>
+    <span class="s0">top_words</span><span class="s3">[</span><span class="s0">class_name</span><span class="s3">] = </span><span class="s0">feature_names</span><span class="s3">[</span><span class="s0">best_indices</span><span class="s3">]</span>
+
+<span class="s0">top_words_df </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">(</span><span class="s0">top_words</span><span class="s3">, </span><span class="s0">index</span><span class="s3">=[</span><span class="s5">f&quot;#</span><span class="s2">{</span><span class="s0">i</span><span class="s2">}</span><span class="s5">&quot; </span><span class="s2">for </span><span class="s0">i </span><span class="s2">in </span><span class="s0">range</span><span class="s3">(</span><span class="s4">1</span><span class="s3">, </span><span class="s4">11</span><span class="s3">)])</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">top_words_df</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% 
+error_mask </span><span class="s3">= </span><span class="s0">test_predictions </span><span class="s3">!= </span><span class="s0">y_test</span>
+<span class="s0">errors_df </span><span class="s3">= </span><span class="s0">test_df</span><span class="s3">.</span><span class="s0">loc</span><span class="s3">[</span><span class="s0">error_mask</span><span class="s3">].</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s0">errors_df</span><span class="s3">[</span><span class="s5">&quot;predicted_label&quot;</span><span class="s3">] = </span><span class="s0">predicted_labels</span><span class="s3">[</span><span class="s0">error_mask</span><span class="s3">]</span>
+<span class="s0">errors_df</span><span class="s3">[</span><span class="s5">&quot;confidence&quot;</span><span class="s3">] = </span><span class="s0">test_probabilities</span><span class="s3">[</span><span class="s0">error_mask</span><span class="s3">].</span><span class="s0">max</span><span class="s3">(</span><span class="s0">axis</span><span class="s3">=</span><span class="s4">1</span><span class="s3">)</span>
+<span class="s0">errors_df </span><span class="s3">= </span><span class="s0">errors_df</span><span class="s3">.</span><span class="s0">sort_values</span><span class="s3">(</span><span class="s5">&quot;confidence&quot;</span><span class="s3">, </span><span class="s0">ascending</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s5">f&quot;Misclassified Test examples: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">errors_df</span><span class="s3">)</span><span class="s2">} </span><span class="s5">/ </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">test_df</span><span class="s3">)</span><span class="s2">}</span><span class="s5">&quot;</span><span class="s3">)</span>
+<span class="s0">display</span><span class="s3">(</span><span class="s0">errors_df</span><span class="s3">.</span><span class="s0">head</span><span class="s3">(</span><span class="s4">8</span><span class="s3">).</span><span class="s0">style</span><span class="s3">.</span><span class="s0">format</span><span class="s3">({</span><span class="s5">&quot;confidence&quot;</span><span class="s3">: </span><span class="s5">&quot;{:.3f}&quot;</span><span class="s3">}))</span><hr class="ls0"><span class="s0">#%% md 
+### Result Analysis 
+ 
+The classifier performs particularly well on `sadness`, `joy`, and `anger`, which have 
+more training examples and clear emotion-related vocabulary. `surprise` and `love` are 
+more difficult because they are smaller and frequently share words with `fear` or `joy`. 
+ 
+TF-IDF is based mainly on word occurrence. It has limited ability to understand deep 
+context, irony, or complex word order. A recurrent neural network or Transformer could 
+model context more effectively, but would require a more complex training process. <hr class="ls0">#%% md 
+## 11. Predicting the Emotion of New Text 
+ 
+The helper function below applies the same cleaning, fitted TF-IDF transformation, and 
+final classifier. It returns the predicted emotion and the probability of every class. <hr class="ls0">#%% 
+</span><span class="s2">def </span><span class="s0">predict_emotion</span><span class="s3">(</span><span class="s0">text</span><span class="s3">):</span>
+    <span class="s0">features </span><span class="s3">= </span><span class="s0">final_vectorizer</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">([</span><span class="s0">text</span><span class="s3">])</span>
+    <span class="s0">probabilities </span><span class="s3">= </span><span class="s0">final_model</span><span class="s3">.</span><span class="s0">predict_proba</span><span class="s3">(</span><span class="s0">features</span><span class="s3">)[</span><span class="s4">0</span><span class="s3">]</span>
+    <span class="s0">prediction </span><span class="s3">= </span><span class="s0">int</span><span class="s3">(</span><span class="s0">np</span><span class="s3">.</span><span class="s0">argmax</span><span class="s3">(</span><span class="s0">probabilities</span><span class="s3">))</span>
+    <span class="s2">return </span><span class="s3">{</span>
+        <span class="s5">&quot;text&quot;</span><span class="s3">: </span><span class="s0">text</span><span class="s3">,</span>
+        <span class="s5">&quot;predicted_emotion&quot;</span><span class="s3">: </span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">inverse_transform</span><span class="s3">([</span><span class="s0">prediction</span><span class="s3">])[</span><span class="s4">0</span><span class="s3">],</span>
+        <span class="s5">&quot;probabilities&quot;</span><span class="s3">: {</span>
+            <span class="s0">label</span><span class="s3">: </span><span class="s0">round</span><span class="s3">(</span><span class="s0">float</span><span class="s3">(</span><span class="s0">probability</span><span class="s3">), </span><span class="s4">4</span><span class="s3">)</span>
+            <span class="s2">for </span><span class="s0">label</span><span class="s3">, </span><span class="s0">probability </span><span class="s2">in </span><span class="s0">zip</span><span class="s3">(</span><span class="s0">label_encoder</span><span class="s3">.</span><span class="s0">classes_</span><span class="s3">, </span><span class="s0">probabilities</span><span class="s3">)</span>
+        <span class="s3">},</span>
+    <span class="s3">}</span>
+
+
+<span class="s0">display</span><span class="s3">(</span><span class="s0">pd</span><span class="s3">.</span><span class="s0">DataFrame</span><span class="s3">([</span>
+    <span class="s0">predict_emotion</span><span class="s3">(</span><span class="s5">&quot;I am so happy and excited about the good news&quot;</span><span class="s3">),</span>
+    <span class="s0">predict_emotion</span><span class="s3">(</span><span class="s5">&quot;I feel nervous and worried about tomorrow&quot;</span><span class="s3">),</span>
+    <span class="s0">predict_emotion</span><span class="s3">(</span><span class="s5">&quot;I miss her and feel completely empty&quot;</span><span class="s3">),</span>
+<span class="s3">]))</span><hr class="ls0"><span class="s0">#%% md 
+## 12. Conclusion 
+ 
+This notebook completed a supervised text-classification workflow for emotion 
+recognition. The original Kaggle splits were preserved, the text was converted into 
+TF-IDF features, and a scikit-learn Logistic Regression classifier was trained and tuned. 
+Hyperparameters were selected with Validation Macro-F1 before the model was retrained and 
+evaluated on the Test set. The results demonstrate that a simple, interpretable linear 
+model can achieve strong performance, while still facing difficulty with rare emotions 
+and sentences that require deeper contextual understanding. 
+ 
+**Before submission:** complete the last four ID digits, upload the executed notebook to 
+GitHub or Colab, verify public viewing permissions, and attach a link to a clear 
+five-minute presentation video.</span></pre>
+</body>
+</html>

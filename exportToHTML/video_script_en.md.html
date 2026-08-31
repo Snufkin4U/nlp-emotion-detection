@@ -1,0 +1,86 @@
+<html>
+<head>
+<title>video_script_en.md</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+video_script_en.md</font>
+</center></td></tr></table>
+<pre><span class="s0"># </span><span class="s2">Five-Minute Presentation Script</span>
+
+<span class="s2">Record the screen while the executed notebook is open. Scroll through the relevant cells and point to the code and outputs while speaking. There is no need to read every line of code.</span>
+
+<span class="s0">## </span><span class="s2">0</span><span class="s1">:</span><span class="s2">00-0</span><span class="s1">:</span><span class="s2">25 - Introduction</span>
+
+<span class="s1">&quot;</span><span class="s2">Hello, I am Maor C. For this assignment I selected text analysis and a supervised multiclass classification problem. I used the Emotions dataset for NLP from Kaggle. The objective is to receive an English sentence and predict its emotion. I trained a multiclass Logistic Regression classifier using the ready-made implementation from scikit-learn.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the notebook title, assignment type, algorithm, and dataset link.</span>
+
+<span class="s0">## </span><span class="s2">0</span><span class="s1">:</span><span class="s2">25-0</span><span class="s1">:</span><span class="s2">55 - Dataset and Learning Problem</span>
+
+<span class="s1">&quot;</span><span class="s2">The dataset contains 20,000 sentences and six classes</span><span class="s1">: </span><span class="s2">anger, fear, joy, love, sadness, and surprise. It is already divided into 16,000 Train samples, 2,000 Validation samples, and 2,000 Test samples, so I did not split any file again. Validation is used for hyperparameter selection, and Test is reserved for the final evaluation.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the split sizes and the first five rows of Train and Test.</span>
+
+<span class="s0">## </span><span class="s2">0</span><span class="s1">:</span><span class="s2">55-1</span><span class="s1">:</span><span class="s2">25 - Exploratory Analysis and Metric</span>
+
+<span class="s1">&quot;</span><span class="s2">I checked missing values, duplicates, and unexpected labels. The class-distribution plot shows that the dataset is imbalanced</span><span class="s1">: </span><span class="s2">joy and sadness are large classes, while surprise is small. Therefore, the primary evaluation metric is Macro-F1. It calculates F1 for every emotion and averages the class scores equally.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the data-quality table, class counts, and plots.</span>
+
+<span class="s0">## </span><span class="s2">1</span><span class="s1">:</span><span class="s2">25-2</span><span class="s1">:</span><span class="s2">05 - Feature Engineering</span>
+
+<span class="s1">&quot;</span><span class="s2">The text is converted to lowercase, URLs and user mentions are replaced with fixed tokens, and irrelevant characters are removed. I then use TF-IDF. Term Frequency measures the importance of a word in a sentence, while Inverse Document Frequency reduces the weight of words that occur throughout the corpus. The vectorizer is fitted on Train only. Validation and Test use transform only, preventing data leakage.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the three Train examples and three Test examples after feature engineering.</span>
+
+<span class="s0">## </span><span class="s2">2</span><span class="s1">:</span><span class="s2">05-2</span><span class="s1">:</span><span class="s2">50 - Learning Algorithm</span>
+
+<span class="s1">&quot;</span><span class="s2">The model is Logistic Regression from scikit-learn. For each TF-IDF vector, the model calculates a linear score for every emotion. In multiclass classification, Softmax converts these scores into probabilities that sum to one. The model minimizes cross-entropy loss and applies L2 regularization.</span><span class="s1">&quot;</span>
+
+<span class="s1">&quot;</span><span class="s2">The important hyperparameters are C, class weight, maximum iterations, and the optimization solver. A larger C means weaker regularization. Balanced class weights give more importance to rare emotions. The estimator provides fit, predict, and predict-proba methods.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the explanation and the `LogisticRegression` construction.</span>
+
+<span class="s0">## </span><span class="s2">2</span><span class="s1">:</span><span class="s2">50-3</span><span class="s1">:</span><span class="s2">35 - Hyperparameter Experiments</span>
+
+<span class="s1">&quot;</span><span class="s2">I tested four combinations on Validation only</span><span class="s1">: </span><span class="s2">a baseline without class weights, balanced weights with C equal to one, balanced weights with C equal to four, and a version that includes both unigrams and bigrams. The results show that balanced class weights improve Macro-F1. C equal to four performs best, while bigrams do not improve the score in this dataset.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the experiment table, validation plot, and selected configuration.</span>
+
+<span class="s0">## </span><span class="s2">3</span><span class="s1">:</span><span class="s2">35-4</span><span class="s1">:</span><span class="s2">25 - Final Training and Test Results</span>
+
+<span class="s1">&quot;</span><span class="s2">After selecting the hyperparameters, I fitted a new vectorizer and classifier on Train and Validation together, using 18,000 examples. I then evaluated the model once on Test. The first five predictions are shown here. The final result is approximately 0.84 Macro-F1 and 0.89 Accuracy. Macro-F1 remains the primary result.</span><span class="s1">&quot;</span>
+
+<span class="s1">&quot;</span><span class="s2">The confusion matrix and classification report show strong performance for sadness, joy, and anger. Surprise and love are more difficult because they have fewer examples and share vocabulary with other emotions.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the five predictions, final scores, report, confusion matrix, and per-class F1 chart.</span>
+
+<span class="s0">## </span><span class="s2">4</span><span class="s1">:</span><span class="s2">25-5</span><span class="s1">:</span><span class="s2">00 - Interpretation, Limitations, and Conclusion</span>
+
+<span class="s1">&quot;</span><span class="s2">Because Logistic Regression is interpretable, I can display the terms with the largest positive coefficient for every emotion. I also examined several high-confidence mistakes. TF-IDF mainly identifies word occurrence and does not fully understand context, irony, or complex word order. A recurrent neural network or Transformer could model context better, but would require a more complex training process. Finally, I added a function that predicts the emotion and class probabilities of any new sentence. Thank you.</span><span class="s1">&quot;</span>
+
+<span class="s2">Show the top-word table, error examples, and the new-text prediction function.</span>
+
+<span class="s0">## </span><span class="s2">Questions to Prepare For</span>
+
+<span class="s0">- </span><span class="s2">Why was the dataset not split again? Kaggle already provides Train, Validation, and Test files, and the assignment requires preserving them.</span>
+<span class="s0">- </span><span class="s2">Why use Macro-F1? It gives equal importance to every emotion in an imbalanced multiclass problem.</span>
+<span class="s0">- </span><span class="s2">Why must TF-IDF not be fitted on Test? Fitting on Test would leak vocabulary and frequency information into training.</span>
+<span class="s0">- </span><span class="s2">What does Softmax do? It converts class scores into probabilities that sum to one.</span>
+<span class="s0">- </span><span class="s2">What does the `C` parameter control? It is the inverse of regularization strength; larger values apply weaker regularization.</span>
+<span class="s0">- </span><span class="s2">Why use balanced class weights? They increase the influence of rare classes during optimization.</span>
+<span class="s0">- </span><span class="s2">Why did bigrams not help? They increased the feature space and added many relatively rare combinations without improving generalization.</span>
+<span class="s0">- </span><span class="s2">What is the difference between Validation and Test? Validation selects hyperparameters; Test provides the final unbiased evaluation.</span>
+
+</pre>
+</body>
+</html>
