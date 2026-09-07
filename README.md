@@ -8,6 +8,7 @@ The notebook includes dataset loading, exploratory data analysis, text cleaning,
 
 | Field | Value |
 |---|---|
+| Students / Authors | Maor Cohen, Lucas Boet, Noam Kolet |
 | Assignment type | Text Analysis / NLP |
 | Learning type | Classification |
 | Implemented learning algorithm | Multiclass Logistic Regression using scikit-learn |
@@ -35,5 +36,3 @@ The executed notebook achieves approximately:
 - Test Accuracy: `0.89`
 
 Macro-F1 is the primary metric required for this multiclass classification task. Accuracy is included as a secondary measure.
-
-
